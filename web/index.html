@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AJAZZ Gamepad</title>
+<style>
+  :root {
+    --bg: #101010; --panel: #1a1a1a; --line: #2e2e2e; --text: #e8e8e8; --muted: #939393;
+    --accent: #f0f0f0; --accent2: #cfcfcf; --warn: #ffffff; --bad: #bdbdbd; --key: #262626;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  .pill { padding: 3px 10px; border-radius: 99px; background: var(--key); color: var(--muted); font-size: 12px; }
+  .pill.ok { color: var(--accent); } .pill.bad { color: var(--bad); }
+  header .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; padding: 16px 20px; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .kbwrap { overflow-x: auto; padding-bottom: 6px; }
+  #kb { position: relative; }
+  .key { position: absolute; border-radius: 6px; background: var(--key); border: 1px solid #3a3a3a; cursor: pointer; overflow: hidden; user-select: none; }
+  .key:hover { border-color: #6a6a6a; }
+  .key.sel { border-color: var(--accent2); box-shadow: 0 0 0 2px #cfcfcf55; }
+  .key .fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(#f0f0f066, #f0f0f022); height: 0; }
+  .key .nm { position: absolute; left: 5px; top: 3px; font-size: 11px; line-height: 1.15; color: #cccccc; white-space: pre-line; }
+  .key .mm { position: absolute; right: 4px; bottom: 2px; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .key .tg { position: absolute; left: 4px; bottom: 2px; font-size: 10px; font-weight: 700; color: var(--warn); }
+  .key.mapped { border-color: #8c8c8c; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+  label { color: var(--muted); font-size: 12px; min-width: 92px; }
+  select, button, input[type=number] { background: var(--key); color: var(--text); border: 1px solid #404040; border-radius: 6px; padding: 6px 9px; font: inherit; }
+  button { cursor: pointer; } button:hover { border-color: #666666; }
+  button.primary { background: #3a3a3a; border-color: #6e6e6e; } button.danger { color: var(--bad); }
+  input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent2); }
+  .val { width: 52px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); font-size: 12px; }
+  .hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+  .bar { height: 10px; background: var(--key); border-radius: 5px; overflow: hidden; flex: 1; }
+  .bar > div { height: 100%; width: 0; background: var(--accent2); }
+  .pad { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .stick { width: 96px; height: 96px; border-radius: 50%; background: var(--key); border: 1px solid #404040; position: relative; }
+  .stick .dot { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--accent); left: 50%; top: 50%; }
+  .stick .cap { position: absolute; top: -18px; width: 100%; text-align: center; font-size: 11px; color: var(--muted); }
+  .btns { display: flex; flex-wrap: wrap; gap: 4px; max-width: 300px; }
+  .btns span { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: var(--key); color: var(--muted); }
+  .btns span.on { background: #6e6e6e; color: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td { padding: 4px 2px; border-top: 1px solid var(--line); }
+  .err { color: var(--bad); font-size: 12px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .two { grid-template-columns: 1fr; } main { padding: 12px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>AJAZZ Gamepad</h1>
+  <span id="st-dev" class="pill">teclado…</span>
+  <span id="st-pad" class="pill">controle…</span>
+  <span id="st-hz" class="pill">0 Hz</span>
+  <span class="spacer"></span>
+  <label style="min-width:0"><input type="checkbox" id="enabled" checked> saída do controle ativa</label>
+</header>
+<main>
+  <div style="display:grid;gap:16px;min-width:0">
+    <section>
+      <h2>Teclado — clique numa tecla para mapear</h2>
+      <div class="kbwrap"><div id="kb"></div></div>
+      <p class="err" id="err"></p>
+      <p class="hint">As teclas continuam digitando normalmente — o app só lê o curso analógico e cria um controle Xbox 360 virtual.
+        Para jogos, use teclas que o jogo não usa, ou desative-as no próprio jogo.</p>
+    </section>
+    <div class="two">
+      <section>
+        <h2>Saída do controle virtual</h2>
+        <div class="pad">
+          <div class="stick"><div class="cap">Analógico E</div><div class="dot" id="ls"></div></div>
+          <div class="stick"><div class="cap">Analógico D</div><div class="dot" id="rs"></div></div>
+          <div style="flex:1;min-width:140px">
+            <div class="row"><label style="min-width:24px">LT</label><div class="bar"><div id="lt"></div></div></div>
+            <div class="row"><label style="min-width:24px">RT</label><div class="bar"><div id="rt"></div></div></div>
+          </div>
+        </div>
+        <div class="btns" id="btns" style="margin-top:12px"></div>
+      </section>
+      <section>
+        <h2>Mapeamentos</h2>
+        <div class="row">
+          <button id="preset-wasd">WASD → analógico E</button>
+          <button id="preset-arrows">Setas → analógico D</button>
+        </div>
+        <div class="row"><label style="min-width:0"><input type="checkbox" id="circular" checked> limitar analógicos a um círculo</label></div>
+        <div class="row"><label>Anti-tremor (mm)</label><input type="range" id="filter" min="0" max="0.4" step="0.01"><span class="val" id="v-filter"></span></div>
+        <p class="hint">Ignora movimentos menores que esse valor. Abaixo de 0,10 os saltos do firmware voltam a aparecer; valores altos deixam a resposta menos imediata ao inverter o movimento.</p>
+        <table id="list"></table>
+        <div class="row"><button class="danger" id="clear">Limpar tudo</button></div>
+      </section>
+    </div>
+  </div>
+  <section id="editor">
+    <h2>Tecla selecionada</h2>
+    <p class="hint" id="ed-empty">Nenhuma tecla selecionada.</p>
+    <div id="ed" hidden>
+      <div class="row"><label>Tecla</label><strong id="ed-name"></strong><span class="val" id="ed-mm"></span></div>
+      <div class="row"><label>Destino</label><select id="ed-target"></select></div>
+      <div id="ed-analog">
+        <div class="row"><label>Início (mm)</label><input type="range" id="ed-start" min="0" max="3.5" step="0.05"><span class="val" id="v-start"></span></div>
+        <div class="row"><label>Fim (mm)</label><input type="range" id="ed-end" min="0.1" max="3.5" step="0.05"><span class="val" id="v-end"></span></div>
+        <div class="row"><label>Curva</label><input type="range" id="ed-curve" min="0.3" max="3" step="0.05"><span class="val" id="v-curve"></span></div>
+        <p class="hint">Curva &lt; 1 deixa o início mais sensível; &gt; 1 dá mais precisão no começo do curso.</p>
+      </div>
+      <div id="ed-button" hidden>
+        <div class="row"><label>Aciona em (mm)</label><input type="range" id="ed-threshold" min="0.1" max="3.4" step="0.05"><span class="val" id="v-threshold"></span></div>
+        <div class="row"><label>Histerese (mm)</label><input type="range" id="ed-hysteresis" min="0" max="1" step="0.05"><span class="val" id="v-hysteresis"></span></div>
+      </div>
+      <div class="row"><label>Saída</label><div class="bar"><div id="ed-out"></div></div></div>
+      <div class="row"><button class="primary" id="ed-save">Salvar mapeamento</button><button class="danger" id="ed-del">Remover</button></div>
+    </div>
+  </section>
+</main>
+<script>
+const LABELS = {
+  "LT": "Gatilho esquerdo (LT)", "RT": "Gatilho direito (RT)",
+  "LX+": "Analógico E → direita", "LX-": "Analógico E → esquerda", "LY+": "Analógico E → cima", "LY-": "Analógico E → baixo",
+  "RX+": "Analógico D → direita", "RX-": "Analógico D → esquerda", "RY+": "Analógico D → cima", "RY-": "Analógico D → baixo",
+  "A": "A", "B": "B", "X": "X", "Y": "Y", "LB": "LB", "RB": "RB", "START": "Start", "BACK": "Back", "GUIDE": "Guide",
+  "LS": "Clique analógico E (LS)", "RS": "Clique analógico D (RS)",
+  "DPAD_UP": "D-pad cima", "DPAD_DOWN": "D-pad baixo", "DPAD_LEFT": "D-pad esquerda", "DPAD_RIGHT": "D-pad direita",
+};
+const GROUPS = [
+  ["Gatilhos (analógico)", ["LT", "RT"]],
+  ["Analógico esquerdo", ["LY+", "LY-", "LX-", "LX+"]],
+  ["Analógico direito", ["RY+", "RY-", "RX-", "RX+"]],
+  ["Botões", ["A", "B", "X", "Y", "LB", "RB", "START", "BACK", "GUIDE", "LS", "RS"]],
+  ["D-pad", ["DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT"]],
+];
+const SHORT = t => t.replace("DPAD_", "D").replace("GUIDE", "G").replace("START", "ST").replace("BACK", "BK");
+const isAnalog = t => /^(LT|RT|[LR][XY][+-])$/.test(t);
+const SCALE = 1.45, MAXMM = 3.5;
+const $ = id => document.getElementById(id);
+
+let layout, defaults, profile, selected = null, state = null;
+const keyEls = {};
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  if (!r.ok) throw new Error((await r.json()).error || r.status);
+  return r.json();
+}
+
+function bindingFor(index) { return profile.bindings.find(b => b.key === index); }
+function keyName(index) { const k = layout.keys.find(k => k.index === index); return k ? k.name : "#" + index; }
+
+function buildKeyboard() {
+  const kb = $("kb");
+  let w = 0, h = 0;
+  for (const k of layout.keys) {
+    const el = document.createElement("div");
+    el.className = "key";
+    Object.assign(el.style, { left: k.x * SCALE + "px", top: k.y * SCALE + "px", width: k.w * SCALE + "px", height: k.h * SCALE + "px" });
+    el.innerHTML = `<div class="fill"></div><span class="nm"></span><span class="tg"></span><span class="mm"></span>`;
+    el.querySelector(".nm").textContent = k.name;
+    el.onclick = () => select(k.index);
+    kb.appendChild(el);
+    keyEls[k.index] = el;
+    w = Math.max(w, (k.x + k.w) * SCALE); h = Math.max(h, (k.y + k.h) * SCALE);
+  }
+  kb.style.width = w + "px"; kb.style.height = h + "px";
+}
+
+function buildTargets() {
+  const sel = $("ed-target");
+  for (const [g, items] of GROUPS) {
+    const og = document.createElement("optgroup"); og.label = g;
+    for (const t of items) { const o = document.createElement("option"); o.value = t; o.textContent = LABELS[t]; og.appendChild(o); }
+    sel.appendChild(og);
+  }
+}
+
+function renderMapped() {
+  for (const [idx, el] of Object.entries(keyEls)) {
+    const b = bindingFor(+idx);
+    el.classList.toggle("mapped", !!b);
+    el.querySelector(".tg").textContent = b ? SHORT(b.target) : "";
+    el.classList.toggle("sel", +idx === selected);
+  }
+  const list = $("list");
+  list.replaceChildren();
+  for (const b of profile.bindings) {
+    const tr = list.insertRow();
+    tr.insertCell().textContent = keyName(b.key);
+    tr.insertCell().textContent = LABELS[b.target] || b.target;
+    const c = tr.insertCell(); c.style.textAlign = "right";
+    const e = document.createElement("button"); e.textContent = "editar"; e.onclick = () => select(b.key); c.appendChild(e);
+  }
+  if (!profile.bindings.length) list.insertRow().insertCell().textContent = "Nenhuma tecla mapeada ainda.";
+  $("circular").checked = profile.circular !== false;
+  $("filter").value = profile.filter ?? defaults.filter;
+  $("v-filter").textContent = (+$("filter").value).toFixed(2);
+}
+
+const SLIDERS = ["start", "end", "curve", "threshold", "hysteresis"];
+function draft() {
+  const target = $("ed-target").value;
+  const b = { key: selected, target };
+  const keys = isAnalog(target) ? ["start", "end", "curve"] : ["threshold", "hysteresis"];
+  for (const k of keys) b[k] = +$("ed-" + k).value;
+  return b;
+}
+function syncEditor() {
+  const analog = isAnalog($("ed-target").value);
+  $("ed-analog").hidden = !analog; $("ed-button").hidden = analog;
+  for (const k of SLIDERS) $("v-" + k).textContent = (+$("ed-" + k).value).toFixed(2);
+}
+function select(index) {
+  selected = index;
+  $("ed-empty").hidden = true; $("ed").hidden = false;
+  $("ed-name").textContent = keyName(index);
+  const b = bindingFor(index) || {};
+  $("ed-target").value = b.target || "RT";
+  for (const k of SLIDERS) $("ed-" + k).value = b[k] ?? defaults[k];
+  $("ed-del").disabled = !bindingFor(index);
+  syncEditor(); renderMapped();
+}
+
+async function saveProfile() {
+  profile.circular = $("circular").checked;
+  profile.filter = +$("filter").value;
+  await api("/api/profile", profile);
+  renderMapped();
+}
+function upsert(b) {
+  profile.bindings = profile.bindings.filter(x => x.key !== b.key);
+  profile.bindings.push(b);
+}
+function keyIndexByName(name) { const k = layout.keys.find(k => k.name.toLowerCase() === name.toLowerCase()); return k && k.index; }
+function preset(pairs) {
+  for (const [name, target] of pairs) {
+    const idx = keyIndexByName(name);
+    if (idx !== undefined) upsert({ key: idx, target, start: defaults.start, end: defaults.end, curve: defaults.curve });
+  }
+  saveProfile();
+}
+
+function curveValue(t, b) {
+  if (!isAnalog(b.target)) return t >= b.threshold ? 1 : 0;
+  const end = Math.max(b.end, b.start + 0.05);
+  return Math.pow(Math.min(1, Math.max(0, (t - b.start) / (end - b.start))), b.curve);
+}
+
+function renderState() {
+  if (!state) return;
+  const dev = $("st-dev");
+  dev.textContent = state.connected ? `AK680MAX conectado (id ${state.device?.id})` : "teclado desconectado";
+  dev.className = "pill " + (state.connected ? "ok" : "bad");
+  const pad = $("st-pad");
+  pad.textContent = state.pad ? "controle Xbox 360 virtual ativo" : "controle virtual indisponível";
+  pad.className = "pill " + (state.pad ? "ok" : "bad");
+  $("st-hz").textContent = state.hz + " leituras/s";
+  $("err").textContent = state.error || "";
+  const tr = state.travel || [];
+  for (const [idx, el] of Object.entries(keyEls)) {
+    const mm = tr[idx] || 0;
+    el.querySelector(".fill").style.height = Math.min(100, mm / MAXMM * 100) + "%";
+    el.querySelector(".mm").textContent = mm ? mm.toFixed(2) : "";
+  }
+  const o = state.output;
+  const place = (el, x, y) => { el.style.left = 50 + x / 32767 * 42 + "%"; el.style.top = 50 - y / 32767 * 42 + "%"; };
+  place($("ls"), o.LX, o.LY); place($("rs"), o.RX, o.RY);
+  $("lt").style.width = o.LT / 2.55 + "%"; $("rt").style.width = o.RT / 2.55 + "%";
+  for (const s of $("btns").children) s.classList.toggle("on", o.buttons.includes(s.dataset.b));
+  if (selected !== null) {
+    const mm = tr[selected] || 0;
+    $("ed-mm").textContent = mm.toFixed(2) + " mm";
+    $("ed-out").style.width = curveValue(mm, draft()) * 100 + "%";
+  }
+}
+
+async function poll() {
+  try { state = await api("/api/state"); renderState(); } catch (e) { $("err").textContent = "App desconectado: " + e.message; }
+  setTimeout(poll, 33);
+}
+
+(async function init() {
+  [layout, { defaults }, profile] = await Promise.all([api("/api/layout"), api("/api/meta"), api("/api/profile")]);
+  profile.bindings ||= [];
+  buildKeyboard(); buildTargets();
+  for (const b of ["A","B","X","Y","LB","RB","BACK","START","GUIDE","LS","RS","DPAD_UP","DPAD_DOWN","DPAD_LEFT","DPAD_RIGHT"]) {
+    const s = document.createElement("span"); s.dataset.b = b; s.textContent = SHORT(b); $("btns").appendChild(s);
+  }
+  $("ed-target").onchange = syncEditor;
+  for (const k of SLIDERS) $("ed-" + k).oninput = syncEditor;
+  $("ed-save").onclick = () => { upsert(draft()); $("ed-del").disabled = false; saveProfile(); };
+  $("ed-del").onclick = () => { profile.bindings = profile.bindings.filter(b => b.key !== selected); $("ed-del").disabled = true; saveProfile(); };
+  $("clear").onclick = () => { profile.bindings = []; saveProfile(); };
+  $("circular").onchange = saveProfile;
+  $("filter").oninput = () => { $("v-filter").textContent = (+$("filter").value).toFixed(2); };
+  $("filter").onchange = saveProfile;
+  $("preset-wasd").onclick = () => preset([["W", "LY+"], ["S", "LY-"], ["A", "LX-"], ["D", "LX+"]]);
+  $("preset-arrows").onclick = () => preset([["↑", "RY+"], ["↓", "RY-"], ["←", "RX-"], ["→", "RX+"]]);
+  $("enabled").onchange = e => api("/api/enabled", { enabled: e.target.checked });
+  renderMapped();
+  poll();
+})();
+</script>
+</body>
+</html>

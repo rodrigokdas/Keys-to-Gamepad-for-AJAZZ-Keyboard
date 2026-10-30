@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+
+# Mapeamentos pessoais; o app recria o arquivo ao salvar
+profiles/default.json
+profiles/*.tmp
+
+# Capturas de tools/capture.py
+*.csv
