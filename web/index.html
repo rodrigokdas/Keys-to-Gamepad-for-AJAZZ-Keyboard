@@ -62,6 +62,7 @@
   <span id="st-hz" class="pill">0 Hz</span>
   <span class="spacer"></span>
   <label style="min-width:0"><input type="checkbox" id="enabled" checked> saída do controle ativa</label>
+  <button class="danger" id="quit">Fechar programa</button>
 </header>
 <main>
   <div style="display:grid;gap:16px;min-width:0">
@@ -141,7 +142,7 @@ const isAnalog = t => /^(LT|RT|[LR][XY][+-])$/.test(t);
 const SCALE = 1.45, MAXMM = 3.5;
 const $ = id => document.getElementById(id);
 
-let layout, defaults, profile, selected = null, state = null;
+let layout, defaults, profile, selected = null, state = null, closed = false;
 const keyEls = {};
 
 async function api(path, body) {
@@ -279,7 +280,14 @@ function renderState() {
 }
 
 async function poll() {
-  try { state = await api("/api/state"); renderState(); } catch (e) { $("err").textContent = "App desconectado: " + e.message; }
+  try {
+    const s = await api("/api/state");
+    if (closed) return;
+    state = s; renderState();
+  } catch (e) {
+    if (closed) return;
+    $("err").textContent = "App desconectado: " + e.message;
+  }
   setTimeout(poll, 33);
 }
 
@@ -301,6 +309,12 @@ async function poll() {
   $("preset-wasd").onclick = () => preset([["W", "LY+"], ["S", "LY-"], ["A", "LX-"], ["D", "LX+"]]);
   $("preset-arrows").onclick = () => preset([["↑", "RY+"], ["↓", "RY-"], ["←", "RX-"], ["→", "RX+"]]);
   $("enabled").onchange = e => api("/api/enabled", { enabled: e.target.checked });
+  $("quit").onclick = async () => {
+    if (!confirm("Fechar o programa? O controle virtual será desconectado.")) return;
+    try { await api("/api/quit", {}); } catch (e) { $("err").textContent = "Não foi possível fechar: " + e.message; return; }
+    closed = true;
+    document.body.innerHTML = '<p style="padding:40px;text-align:center">Programa encerrado. Pode fechar esta aba.</p>';
+  };
   renderMapped();
   poll();
 })();

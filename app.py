@@ -192,6 +192,10 @@ def make_handler(engine):
             elif self.path == "/api/enabled":
                 engine.enabled = bool(body.get("enabled"))
                 self._send(200, {"ok": True})
+            elif self.path == "/api/quit":
+                self._send(200, {"ok": True})
+                # shutdown() bloqueia até o serve_forever terminar, então não pode rodar neste thread.
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
             else:
                 self._send(404, {"error": "não encontrado"})
 
